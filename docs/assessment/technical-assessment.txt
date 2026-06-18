@@ -1,0 +1,532 @@
+Technical Assessment
+
+Odoo Fund Management Module
+
+Position: Trainee Software Developer
+Company: NN Services & Engineering Ltd.
+Assessment Type: Odoo Custom Module Development
+Deadline: 24 June, 2026 at 11:59PM
+Module Name: nn_fund_management
+
+
+
+              Deliverables
+
+The candidate must submit:
+
+1. Complete and installable Odoo custom module
+2. Git repository link
+3. README file containing:
+○ Odoo version
+○ Installation instructions
+○ Required dependencies
+○ Configuration steps
+○ Testing instructions
+○ Assumptions
+○ Known limitations
+4. Access control and security files
+5. Short architecture explanation
+6. Screen recording of the implemented features from UI and code with facecam on.Try
+to keep the video as short as possible. (Google Drive Public Links Only.)
+7. Meaningful Git commit history.
+8. Dockerized project.
+
+The video explanation should also include:
+
+● AI tools used
+● Implemented Features
+● Which parts were developed with AI assistance
+● Important prompts or prompt summaries
+● Errors found in AI-generated code
+● Changes made by the candidate
+● Known limitations
+● Which parts were fully understood and implemented by the candidate
+
+AI tools are allowed. However, the candidate must understand and be able to explain or
+modify all submitted code.
+
+Please do not feel overwhelmed by the task - full completion is not mandatory, as we will
+mainly evaluate your approach, understanding, prioritization and problem-solving; AI tools
+are fully allowed, the project should be Dockerized, and live server deployment is
+encouraged if possible.
+
+
+
+    1. Objective
+
+    Develop an installable Odoo custom module to manage:
+
+    ● Incoming funds
+    ● Unassigned fund balances
+    ● Project and expense-head allocations
+    ● Fund requisitions
+    ● Bills against approved requisitions
+    ● Transfers between projects or expense heads
+    ● GM and MD approval
+    ● Available, held, assigned and spent balances
+    ● Approval and transaction history
+
+    The system must ensure that the same money cannot be allocated, transferred or spent
+    more than once.
+
+
+
+    2. Fund Accounts and Incoming Funds
+
+    Create Fund Accounts for bank, cash or other financial accounts.
+
+    Each account should display:
+
+    ● Total received
+    ● Available unassigned balance
+    ● Amount currently on hold
+    ● Total assigned amount
+
+    Users should be able to record incoming funds with:
+
+    ● Fund account
+    ● Date
+    ● Amount
+    ● Transaction reference
+
+● Sender or source
+● Description
+● Attachment
+● Company
+● Status
+
+After confirmation, the amount should be added to the account’s unassigned balance.
+
+The same transaction reference must not be used twice within the same fund account.
+
+
+
+3. Fund Allocation
+
+Funds may be assigned to:
+
+● A project, or
+● An expense head
+
+Examples of expense heads include:
+
+● Office rent
+● Salary
+● Utility expenses
+● Marketing expenses
+● Administrative expenses
+
+A transaction must use either a project or an expense head, not both.
+
+An allocation request should contain:
+
+● Request number
+● Fund account
+● Project or expense head
+● Amount
+● Purpose
+● Request date
+● Requested by
+● Attachment
+● Status
+● Approval history
+
+Workflow
+Draft → Submitted → GM Approval → MD Approval → Approved / Rejected
+/ Cancelled
+
+Allocation Rules
+
+When an allocation request is submitted:
+
+● The amount must be deducted from the available unassigned balance.
+● The amount must remain on hold while approval is pending.
+● The held amount cannot be used by another request.
+
+When approved:
+
+● The amount becomes available under the selected project or expense head.
+
+When rejected or cancelled:
+
+● The amount returns to the unassigned balance.
+
+The system must block an allocation request if the requested amount is greater than the
+available unassigned balance.
+
+
+
+4. Approval Process
+
+The minimum approval levels are:
+
+1. General Manager
+2. Managing Director
+
+The system must ensure that:
+
+● GM approval is completed before MD approval.
+● MD cannot approve before GM.
+● Only the current approver can approve or reject.
+● Users cannot approve their own requests unless specially authorized.
+● Approvers are configurable and not hardcoded.
+● Every decision records the approver, date, approval level, comment and result.
+● Repeated approval actions do not create duplicate fund movements.
+
+The approval workflow should be used for:
+
+● Fund allocations
+● Fund requisitions
+● Fund transfers
+
+5. Project and Expense Balances
+
+Each project or expense head should display:
+
+● Total allocated fund
+● Available fund
+● Requisition hold
+● Transfer hold
+● Approved but unspent amount
+● Total spent amount
+● Incoming transfers
+● Outgoing transfers
+
+Balance fields should be calculated automatically.
+
+Users must not be able to manually edit the balance fields.
+
+Negative balances must not be allowed.
+
+
+
+6. Fund Requisition
+
+Users should be able to request funds from a project or expense head.
+
+The requisition should contain:
+
+● Requisition number
+● Project or expense head
+● Requested amount
+● Purpose
+● Request date
+● Required date
+● Requested by
+● Supporting attachment
+● Status
+● Approval history
+● Remaining billable amount
+
+Workflow
+Draft → Submitted → GM Approval → MD Approval → Approved / Rejected
+/ Cancelled / Closed
+
+Requisition Rules
+
+When submitted:
+
+● The system must check the available project or expense balance.
+● The requested amount must be placed on hold.
+● The held amount cannot be used for another requisition or transfer.
+
+When approved:
+
+● The amount remains reserved for bills against the requisition.
+
+When rejected or cancelled:
+
+● The amount returns to the available project or expense balance.
+
+A requisition may be closed when:
+
+● The full approved amount has been billed, or
+● The unused amount has been released back to the available balance.
+
+
+
+7. Bill Control
+
+A bill must be linked to an approved fund requisition.
+
+The system must enforce the following rules:
+
+● Only approved requisitions can be used for bills.
+● The bill must use the same project or expense head as the requisition.
+● A bill cannot exceed the requisition’s remaining billable amount.
+● Multiple partial bills are allowed.
+● The total billed amount cannot exceed the approved requisition amount.
+● Project A cannot use a requisition created for Project B.
+● One expense head cannot use another expense head’s requisition.
+
+When a bill is posted:
+
+● The bill amount should be marked as spent.
+● The requisition’s remaining billable amount should decrease.
+
+When a posted bill is cancelled or reversed:
+
+● The amount should return to the requisition’s remaining billable balance.
+● The reversal must not create additional funds.
+
+The candidate may integrate this feature with Odoo Vendor Bills or create a custom bill
+model.
+
+
+
+
+
+
+
+
+
+8. Fund Transfer
+
+Users should be able to transfer funds between:
+
+● Project to project
+● Project to expense head
+● Expense head to project
+● Expense head to expense head
+
+The transfer request should contain:
+
+● Transfer number
+● Source
+● Destination
+● Amount
+● Reason
+● Requested by
+● Request date
+● Status
+● Approval history
+
+Workflow
+Draft → Submitted → GM Approval → MD Approval → Approved / Rejected
+/ Cancelled
+
+Transfer Rules
+
+When submitted:
+
+● The amount must be deducted from the source’s available balance.
+● The amount must remain on transfer hold.
+
+● The held amount cannot be spent, requisitioned or transferred again.
+
+When approved:
+
+● The amount should be added to the destination balance.
+
+When rejected or cancelled:
+
+● The amount should return to the source balance.
+
+The system must also ensure that:
+
+● The transfer amount cannot exceed the source’s available balance.
+● The source and destination cannot be the same.
+
+
+
+
+
+
+9. Security and Access Control
+
+Create suitable security groups, such as:
+
+● Fund User
+● Finance User
+● GM Approver
+● MD Approver
+● Fund Administrator
+
+The system should ensure that:
+
+● Fund users can create and view allowed requests.
+● Only assigned approvers can approve or reject.
+● Only authorized finance users can confirm incoming funds.
+● Only authorized users can cancel approved transactions.
+● Users cannot access unauthorized company records.
+● Security is checked on the server side.
+
+The module should include:
+
+● Access control lists
+● Record rules
+● Server-side permission checks
+
+Hiding buttons in the user interface is not enough.
+
+10. Audit History
+
+The system should preserve a clear history of financial actions.
+
+The history should record:
+
+● Record creator
+● Person who submitted the request
+● Approver or rejecter
+● Previous and new status
+● Date and time
+● Comments
+● Amount
+● Related fund account
+● Related project or expense head
+● Reference document
+
+Confirmed financial records should not be deleted without a proper cancellation or reversal
+process.
+
+
+
+
+
+11. Bonus Features
+
+Configurable Approval Rules
+
+Create approval rules based on:
+
+● Request type
+● Minimum and maximum amount
+● Company
+● Project or expense category
+● Approval sequence
+● User or security group
+
+Example:
+
+● Up to BDT 50,000: GM approval
+● BDT 50,001-200,000: GM and Finance approval
+● Above BDT 200,000: GM, Finance and MD approval
+
+Bank Email Integration
+
+Create a prototype that reads bank transaction notification emails and creates incoming fund
+records.
+
+The system should try to identify:
+
+● Bank name
+● Account number or masked account number
+● Transaction reference
+● Transaction date
+● Received amount
+● Sender information
+● Email message ID
+
+Requirements:
+
+● The same email cannot be processed twice.
+● Duplicate transaction references must be detected.
+● Failed email parsing should be logged.
+● Real bank credentials must not be included in the source code.
+● Email-created funds may first remain in a “Pending Verification” state.
+
+
+
+Dashboard and Notifications
+
+Create a simple dashboard showing:
+
+● Total funds received
+● Unassigned balance
+● Held amount
+● Assigned amount
+● Spent amount
+● Pending approvals
+● Project balances
+● Expense-head balances
+● Recent fund movements
+
+Create Odoo activities or notifications when:
+
+● A request is submitted
+● Approval is required
+● A request is approved
+● A request is rejected
+● A requisition is almost fully used
+
+● A bank email cannot be processed
+
+
+
+13. Sample Demonstration
+
+Use the following example during the demonstration:
+
+1. Receive BDT 1,000,000 in a fund account.
+2. Request BDT 600,000 for Project A.
+3. Show that BDT 600,000 remains on hold while pending.
+4. Reject the request and show that the money returns to the unassigned balance.
+5. Submit the allocation again and approve it.
+6. Transfer BDT 200,000 from Project A to Project B.
+7. Show that the transfer amount remains on hold while approval is pending.
+8. Approve the transfer.
+9. Create a BDT 150,000 requisition for Project B.
+10. Create a BDT 100,000 partial bill.
+11. Show that BDT 50,000 remains billable.
+12. Try to create another bill for BDT 60,000 and block it.
+13. Try to use Project B’s requisition for Project A and block it.
+
+
+
+14. Technical Expectations
+
+The module should demonstrate:
+
+● Proper use of Odoo models
+● Clean model relationships
+● Server-side constraints
+● Computed balance fields
+● Proper access control
+● Clear workflow states
+● Reusable approval logic
+● Clear error messages
+● Maintainable Python and XML code
+● No hardcoded user IDs or database IDs
+● No manual editing of calculated balances
+
+Direct SQL should only be used when technically necessary and clearly explained.
+
+15. Evaluation Areas
+
+The submission will be reviewed based on:
+
+● Business logic and workflow accuracy
+● Balance calculation and data integrity
+● Prevention of double spending
+● Odoo model and module structure
+● Security and access control
+● Approval workflow implementation
+● Automated test quality
+● Code readability and maintainability
+● Documentation quality
+● AI usage transparency
+● Ability to explain and modify the submitted solution
+
+
+
+
+
+
+
+
+
+
+16. Technical Interview
+
+During the technical interview, the candidate may be asked to:
+
+● Explain how balances are calculated.
+● Demonstrate how double spending is prevented.
+● Add or remove an approval level.
+● Change an approval rule.
+● Explain what happens when a bill is cancelled.
+● Fix a workflow issue.
+● Add a new automated test.
+● Explain how unauthorized approval is blocked.
+● Demonstrate that pending transfer funds cannot be used.
+● Make a small live modification to the module.
