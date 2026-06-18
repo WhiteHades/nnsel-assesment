@@ -25,6 +25,9 @@ venv/
 node_modules/
 dist/
 *.tsbuildinfo
+test-results/
+playwright-report/
+blob-report/
 .idea/
 .vscode/
 .DS_Store

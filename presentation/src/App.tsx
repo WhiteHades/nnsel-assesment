@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 
 const coverage = [
   {
@@ -37,7 +37,7 @@ const coverage = [
   {
     icon: ArrowRightLeft,
     title: "Transfers",
-    text: "Project-to-project fund movement with pending holds until approval completes.",
+    text: "Project and expense-head fund movement with pending holds until approval completes.",
   },
   {
     icon: ShieldCheck,
@@ -62,16 +62,17 @@ const phases = [
 const evidence = [
   "Odoo 19 Community addon with Docker Compose runtime",
   "PostgreSQL-backed ledger instead of calculated-only balances",
-  "Backend tests covering the required money-control flow",
+  "Backend tests covering required and optional money-control paths",
   "Demo data and interviewer walkthrough included",
+  "Recording guide included for the final facecam demo",
   "Vercel presentation site separated from the Odoo runtime",
 ];
 
 const metrics = [
-  { value: "8", label: "workflow test cases" },
+  { value: "16", label: "module tests" },
   { value: "0", label: "latest test failures" },
   { value: "2", label: "approval tiers" },
-  { value: "100%", label: "required scope targeted" },
+  { value: "6", label: "core workflows" },
 ];
 
 function App() {
@@ -81,9 +82,9 @@ function App() {
         <img
           src="/fund-management-preview.png"
           alt="Fund management dashboard preview"
-          className="absolute inset-x-0 bottom-0 -z-10 h-full w-full object-cover object-center opacity-35"
+          className="absolute inset-x-0 bottom-0 -z-10 h-full w-full object-cover object-center opacity-25"
         />
-        <div className="absolute inset-0 -z-10 bg-white/72" />
+        <div className="absolute inset-0 -z-10 bg-white/84" />
         <div className="mx-auto flex min-h-[88svh] max-w-7xl flex-col justify-between px-5 py-5 sm:px-8 lg:px-10">
           <nav className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
