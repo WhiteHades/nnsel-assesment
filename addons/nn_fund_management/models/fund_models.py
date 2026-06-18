@@ -26,6 +26,7 @@ class FundMovement(models.Model):
     purpose = fields.Char(required=True, copy=False, index=True)
     movement_type = fields.Selection([
         ('incoming_confirm', 'Incoming confirmation'),
+        ('incoming_cancel', 'Incoming cancellation'),
         ('allocation_submit', 'Allocation hold'),
         ('allocation_approve', 'Allocation approval'),
         ('allocation_release', 'Allocation release'),
@@ -106,6 +107,8 @@ class FundApprovalRule(models.Model):
     max_amount = fields.Monetary(default=0.0, currency_field='currency_id')
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company, index=True)
     currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
+    project_id = fields.Many2one('project.project', check_company=True)
+    expense_head_id = fields.Many2one('fund.expense.head', check_company=True)
     sequence = fields.Integer(default=10, required=True)
     approver_user_id = fields.Many2one('res.users', string='Approver User')
     approver_group_id = fields.Many2one('res.groups', string='Approver Group')
@@ -124,15 +127,28 @@ class FundApprovalRule(models.Model):
             if rule.max_amount and rule.max_amount < rule.min_amount:
                 raise ValidationError(_('Maximum amount cannot be below minimum amount.'))
 
+    @api.constrains('project_id', 'expense_head_id')
+    def _check_single_target(self):
+        for rule in self:
+            if rule.project_id and rule.expense_head_id:
+                raise ValidationError(_('Set either a project or an expense head, not both.'))
+
     @api.model
-    def matching_rules(self, request_type, amount, company):
-        rules = self.search([
+    def matching_rules(self, request_type, amount, company, project=None, expense=None):
+        domain = [
             ('active', '=', True),
             ('request_type', '=', request_type),
             '|', ('company_id', '=', False), ('company_id', '=', company.id),
             ('min_amount', '<=', amount),
             '|', ('max_amount', 'in', [False, 0.0]), ('max_amount', '>=', amount),
-        ])
+        ]
+        if project:
+            domain.extend(['|', '&', ('project_id', '=', False), ('expense_head_id', '=', False), ('project_id', '=', project.id)])
+        elif expense:
+            domain.extend(['|', '&', ('project_id', '=', False), ('expense_head_id', '=', False), ('expense_head_id', '=', expense.id)])
+        else:
+            domain.extend([('project_id', '=', False), ('expense_head_id', '=', False)])
+        rules = self.search(domain)
         if not rules:
             raise UserError(_('No approval rule is configured for this request.'))
         return rules.sorted(lambda rule: (rule.sequence, rule.id))
@@ -337,15 +353,34 @@ class FundRequestMixin(models.AbstractModel):
             ('source_id', '=', self.id),
         ])
 
+    def _approval_rule_target(self):
+        self.ensure_one()
+        if self._name == 'fund.transfer':
+            return self._source()
+        if 'project_id' in self._fields and 'expense_head_id' in self._fields:
+            return self._target_values()
+        return False, False
+
+    def _matching_approval_rules(self, request_type):
+        self.ensure_one()
+        project, expense = self._approval_rule_target()
+        return self.env['fund.approval.rule'].matching_rules(
+            request_type,
+            self.amount,
+            self.company_id,
+            project=project,
+            expense=expense,
+        )
+
     def _pending_step(self):
         self.ensure_one()
         return self._approval_steps().filtered(lambda step: step.state == 'pending')[:1]
 
-    def _create_approval_steps(self, request_type):
+    def _create_approval_steps(self, request_type, rules=None):
         self.ensure_one()
         if self._approval_steps():
             return
-        rules = self.env['fund.approval.rule'].matching_rules(request_type, self.amount, self.company_id)
+        rules = rules or self._matching_approval_rules(request_type)
         for rule in rules:
             vals = {
                 'name': rule.name,
@@ -606,7 +641,19 @@ class FundIncoming(models.Model):
         for incoming in self:
             if incoming.state == 'confirmed' and not incoming._is_finance():
                 raise AccessError(_('Only finance users can cancel confirmed incoming funds.'))
+            if incoming.state == 'cancelled':
+                continue
             previous = incoming.state
+            if incoming.state == 'confirmed':
+                incoming._create_movement(
+                    purpose='cancel',
+                    movement_type='incoming_cancel',
+                    bucket='account_unassigned',
+                    direction='out',
+                    amount=incoming.amount,
+                    fund_account=incoming.fund_account_id,
+                    description=incoming.transaction_reference,
+                )
             incoming.write({'state': 'cancelled'})
             incoming._history('cancel', previous, 'cancelled', amount=incoming.amount, fund_account=incoming.fund_account_id)
 
@@ -666,13 +713,14 @@ class FundAllocation(models.Model):
             if allocation.state != 'draft':
                 raise UserError(_('Only draft allocations can be submitted.'))
             allocation.fund_account_id._lock_company_scope()
+            rules = allocation._matching_approval_rules('allocation')
             if allocation.amount > allocation.fund_account_id.available_unassigned_balance:
                 raise ValidationError(_('Allocation amount cannot exceed available unassigned balance.'))
             allocation._create_movement('submit_unassigned', 'allocation_submit', 'account_unassigned', 'out', allocation.amount, fund_account=allocation.fund_account_id)
             allocation._create_movement('submit_hold', 'allocation_submit', 'account_allocation_hold', 'in', allocation.amount, fund_account=allocation.fund_account_id)
             previous = allocation.state
             allocation.write({'state': 'submitted'})
-            allocation._create_approval_steps('allocation')
+            allocation._create_approval_steps('allocation', rules=rules)
             allocation._history('submit', previous, 'submitted', amount=allocation.amount, fund_account=allocation.fund_account_id)
             allocation.message_post(body=_('Allocation submitted.'))
 
@@ -795,13 +843,14 @@ class FundRequisition(models.Model):
                 raise UserError(_('Only draft requisitions can be submitted.'))
             project, expense = requisition._target_values()
             requisition._lock_target_scope(project=project, expense=expense)
+            rules = requisition._matching_approval_rules('requisition')
             if requisition.amount > requisition._target_balance('available', project=project, expense=expense):
                 raise ValidationError(_('Requisition amount cannot exceed available target balance.'))
             requisition._create_target_movement('submit_available', 'requisition_submit', 'available', 'out', requisition.amount, project=project, expense=expense)
             requisition._create_target_movement('submit_hold', 'requisition_submit', 'requisition_hold', 'in', requisition.amount, project=project, expense=expense)
             previous = requisition.state
             requisition.write({'state': 'submitted'})
-            requisition._create_approval_steps('requisition')
+            requisition._create_approval_steps('requisition', rules=rules)
             requisition._history('submit', previous, 'submitted', amount=requisition.amount, project=project, expense_head=expense)
             requisition.message_post(body=_('Requisition submitted.'))
 
@@ -1043,13 +1092,14 @@ class FundTransfer(models.Model):
                 raise UserError(_('Only draft transfers can be submitted.'))
             source_project, source_expense = transfer._source()
             transfer._lock_target_scope(project=source_project, expense=source_expense)
+            rules = transfer._matching_approval_rules('transfer')
             if transfer.amount > transfer._target_balance('available', project=source_project, expense=source_expense):
                 raise ValidationError(_('Transfer amount cannot exceed source available balance.'))
             transfer._create_target_movement('submit_available', 'transfer_submit', 'available', 'out', transfer.amount, project=source_project, expense=source_expense)
             transfer._create_target_movement('submit_hold', 'transfer_submit', 'transfer_hold', 'in', transfer.amount, project=source_project, expense=source_expense)
             previous = transfer.state
             transfer.write({'state': 'submitted'})
-            transfer._create_approval_steps('transfer')
+            transfer._create_approval_steps('transfer', rules=rules)
             transfer._history('submit', previous, 'submitted', amount=transfer.amount, project=source_project, expense_head=source_expense)
             transfer.message_post(body=_('Transfer submitted.'))
 

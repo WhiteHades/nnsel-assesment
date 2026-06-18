@@ -10,6 +10,8 @@
                 <field name="request_type"/>
                 <field name="min_amount"/>
                 <field name="max_amount"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
                 <field name="approver_user_id"/>
                 <field name="approver_group_id"/>
                 <field name="company_id" groups="base.group_multi_company"/>
@@ -34,6 +36,8 @@
                             <field name="sequence"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="currency_id" invisible="1"/>
+                            <field name="project_id"/>
+                            <field name="expense_head_id"/>
                         </group>
                         <group>
                             <field name="min_amount"/>
