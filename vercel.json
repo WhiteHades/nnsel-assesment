@@ -1,0 +1,6 @@
+{
+  "framework": "vite",
+  "installCommand": "cd presentation && npm ci",
+  "buildCommand": "cd presentation && npm run build",
+  "outputDirectory": "presentation/dist"
+}
