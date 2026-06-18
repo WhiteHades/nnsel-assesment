@@ -1,6 +1,7 @@
 # local secrets
 .env
 .env.*
+!.env.example
 odoo_pg_pass
 *.pem
 *.key
@@ -21,9 +22,13 @@ htmlcov/
 # local tooling
 .venv/
 venv/
+node_modules/
+dist/
+*.tsbuildinfo
 .idea/
 .vscode/
 .DS_Store
 
 # assessment source binary
 Technical Assessment.pdf
+.vercel
