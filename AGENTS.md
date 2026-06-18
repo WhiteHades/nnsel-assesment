@@ -14,9 +14,9 @@ Read this file before every task in this repository. Working code matters more t
 
 ## Project phase
 
-This repository is in planning and initialization for the NN Services and Engineering technical assessment.
+This repository is in implementation, verification, and handoff for the NN Services and Engineering technical assessment.
 
-Do not implement the Odoo module until the user starts the implementation phase.
+Implementation work is allowed. Keep changes scoped to the assessment deliverable, reviewer documentation, verification, and deployment support.
 
 ## Assessment handling
 
@@ -40,7 +40,7 @@ Use phased commits that match the work:
 2. repo setup and agent guidance
 3. domain model and architecture decisions
 4. implementation plan and delivery strategy
-5. implementation commits in later phases
+5. implementation commits grouped by backend, tests, docs, presentation, and deployment support
 
 Do not commit secrets, Odoo data volumes, database dumps, or local environment files.
 
