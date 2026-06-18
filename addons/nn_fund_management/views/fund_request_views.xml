@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fund_allocation_list" model="ir.ui.view">
+        <field name="name">fund.allocation.list</field>
+        <field name="model">fund.allocation</field>
+        <field name="arch" type="xml">
+            <list string="Fund Allocations" decoration-success="state == 'approved'" decoration-warning="state in ['submitted', 'gm_approved']" decoration-muted="state in ['rejected', 'cancelled']">
+                <field name="name"/>
+                <field name="request_date"/>
+                <field name="fund_account_id"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <field name="requested_by_id" widget="many2one_avatar_user"/>
+                <field name="amount" sum="Amount"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_allocation_form" model="ir.ui.view">
+        <field name="name">fund.allocation.form</field>
+        <field name="model">fund.allocation</field>
+        <field name="arch" type="xml">
+            <form string="Fund Allocation">
+                <header>
+                    <button name="action_submit" string="Submit" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve" type="object" class="oe_highlight" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_reject" string="Reject" type="object" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ['rejected', 'cancelled']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,gm_approved,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="fund_account_id"/>
+                            <field name="amount"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="request_date"/>
+                            <field name="requested_by_id" widget="many2one_avatar_user"/>
+                        </group>
+                        <group>
+                            <field name="project_id"/>
+                            <field name="expense_head_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="purpose"/>
+                        <field name="attachment_ids" widget="many2many_binary"/>
+                    </group>
+                    <notebook>
+                        <page string="Approval Steps">
+                            <field name="approval_step_ids" readonly="1">
+                                <list>
+                                    <field name="sequence"/>
+                                    <field name="name"/>
+                                    <field name="approver_user_id"/>
+                                    <field name="approver_group_id"/>
+                                    <field name="state"/>
+                                    <field name="decision_user_id"/>
+                                    <field name="decision_date"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Approval History">
+                            <field name="approval_history_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="action"/>
+                                    <field name="previous_state"/>
+                                    <field name="new_state"/>
+                                    <field name="approval_level"/>
+                                    <field name="user_id"/>
+                                    <field name="amount"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_fund_allocation_search" model="ir.ui.view">
+        <field name="name">fund.allocation.search</field>
+        <field name="model">fund.allocation</field>
+        <field name="arch" type="xml">
+            <search string="Fund Allocations">
+                <field name="name"/>
+                <field name="fund_account_id"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <filter string="Pending Approval" name="pending" domain="[('state', 'in', ['submitted', 'gm_approved'])]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <group>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Fund Account" name="group_account" context="{'group_by': 'fund_account_id'}"/>
+                    <filter string="Requester" name="group_requester" context="{'group_by': 'requested_by_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_fund_allocation" model="ir.actions.act_window">
+        <field name="name">Fund Allocations</field>
+        <field name="res_model">fund.allocation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_fund_allocation_search"/>
+    </record>
+
+    <record id="view_fund_requisition_list" model="ir.ui.view">
+        <field name="name">fund.requisition.list</field>
+        <field name="model">fund.requisition</field>
+        <field name="arch" type="xml">
+            <list string="Fund Requisitions" decoration-success="state in ['approved', 'closed']" decoration-warning="state in ['submitted', 'gm_approved']" decoration-muted="state in ['rejected', 'cancelled']">
+                <field name="name"/>
+                <field name="request_date"/>
+                <field name="required_date"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <field name="requested_by_id" widget="many2one_avatar_user"/>
+                <field name="amount" sum="Amount"/>
+                <field name="remaining_billable_amount" sum="Remaining"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_requisition_form" model="ir.ui.view">
+        <field name="name">fund.requisition.form</field>
+        <field name="model">fund.requisition</field>
+        <field name="arch" type="xml">
+            <form string="Fund Requisition">
+                <header>
+                    <button name="action_submit" string="Submit" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve" type="object" class="oe_highlight" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_reject" string="Reject" type="object" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_close" string="Close" type="object" groups="nn_fund_management.group_finance_user" invisible="state != 'approved'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ['rejected', 'cancelled', 'closed']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,gm_approved,approved,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="project_id"/>
+                            <field name="expense_head_id"/>
+                            <field name="amount"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="remaining_billable_amount" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="request_date"/>
+                            <field name="required_date"/>
+                            <field name="requested_by_id" widget="many2one_avatar_user"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="purpose"/>
+                        <field name="attachment_ids" widget="many2many_binary"/>
+                    </group>
+                    <notebook>
+                        <page string="Bills">
+                            <field name="bill_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="bill_date"/>
+                                    <field name="vendor"/>
+                                    <field name="amount"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Approval Steps">
+                            <field name="approval_step_ids" readonly="1">
+                                <list>
+                                    <field name="sequence"/>
+                                    <field name="name"/>
+                                    <field name="approver_user_id"/>
+                                    <field name="approver_group_id"/>
+                                    <field name="state"/>
+                                    <field name="decision_user_id"/>
+                                    <field name="decision_date"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Approval History">
+                            <field name="approval_history_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="action"/>
+                                    <field name="previous_state"/>
+                                    <field name="new_state"/>
+                                    <field name="approval_level"/>
+                                    <field name="user_id"/>
+                                    <field name="amount"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fund_requisition" model="ir.actions.act_window">
+        <field name="name">Fund Requisitions</field>
+        <field name="res_model">fund.requisition</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_fund_bill_list" model="ir.ui.view">
+        <field name="name">fund.bill.list</field>
+        <field name="model">fund.bill</field>
+        <field name="arch" type="xml">
+            <list string="Fund Bills" decoration-success="state == 'posted'" decoration-muted="state in ['cancelled', 'reversed']">
+                <field name="name"/>
+                <field name="bill_date"/>
+                <field name="requisition_id"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <field name="vendor"/>
+                <field name="amount" sum="Amount"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_bill_form" model="ir.ui.view">
+        <field name="name">fund.bill.form</field>
+        <field name="model">fund.bill</field>
+        <field name="arch" type="xml">
+            <form string="Fund Bill">
+                <header>
+                    <button name="action_post" string="Post" type="object" class="oe_highlight" groups="nn_fund_management.group_finance_user" invisible="state != 'draft'"/>
+                    <button name="action_reverse" string="Reverse" type="object" groups="nn_fund_management.group_finance_user" invisible="state != 'posted'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted,reversed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="requisition_id"/>
+                            <field name="project_id"/>
+                            <field name="expense_head_id"/>
+                            <field name="amount"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="bill_date"/>
+                            <field name="vendor"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"/>
+                        <field name="attachment_ids" widget="many2many_binary"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fund_bill" model="ir.actions.act_window">
+        <field name="name">Fund Bills</field>
+        <field name="res_model">fund.bill</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_fund_transfer_list" model="ir.ui.view">
+        <field name="name">fund.transfer.list</field>
+        <field name="model">fund.transfer</field>
+        <field name="arch" type="xml">
+            <list string="Fund Transfers" decoration-success="state == 'approved'" decoration-warning="state in ['submitted', 'gm_approved']" decoration-muted="state in ['rejected', 'cancelled']">
+                <field name="name"/>
+                <field name="request_date"/>
+                <field name="source_project_id"/>
+                <field name="source_expense_head_id"/>
+                <field name="destination_project_id"/>
+                <field name="destination_expense_head_id"/>
+                <field name="amount" sum="Amount"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_transfer_form" model="ir.ui.view">
+        <field name="name">fund.transfer.form</field>
+        <field name="model">fund.transfer</field>
+        <field name="arch" type="xml">
+            <form string="Fund Transfer">
+                <header>
+                    <button name="action_submit" string="Submit" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve" type="object" class="oe_highlight" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_reject" string="Reject" type="object" groups="nn_fund_management.group_gm_approver,nn_fund_management.group_md_approver" invisible="state not in ['submitted', 'gm_approved']"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ['rejected', 'cancelled', 'approved']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,gm_approved,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Source">
+                            <field name="source_project_id"/>
+                            <field name="source_expense_head_id"/>
+                        </group>
+                        <group string="Destination">
+                            <field name="destination_project_id"/>
+                            <field name="destination_expense_head_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="amount"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="request_date"/>
+                            <field name="requested_by_id" widget="many2one_avatar_user"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="reason"/>
+                    </group>
+                    <notebook>
+                        <page string="Approval Steps">
+                            <field name="approval_step_ids" readonly="1">
+                                <list>
+                                    <field name="sequence"/>
+                                    <field name="name"/>
+                                    <field name="approver_user_id"/>
+                                    <field name="approver_group_id"/>
+                                    <field name="state"/>
+                                    <field name="decision_user_id"/>
+                                    <field name="decision_date"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Approval History">
+                            <field name="approval_history_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="action"/>
+                                    <field name="previous_state"/>
+                                    <field name="new_state"/>
+                                    <field name="approval_level"/>
+                                    <field name="user_id"/>
+                                    <field name="amount"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fund_transfer" model="ir.actions.act_window">
+        <field name="name">Fund Transfers</field>
+        <field name="res_model">fund.transfer</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_fund_bank_email_list" model="ir.ui.view">
+        <field name="name">fund.bank.email.list</field>
+        <field name="model">fund.bank.email</field>
+        <field name="arch" type="xml">
+            <list string="Bank Emails" decoration-danger="state == 'failed'" decoration-success="state == 'created'">
+                <field name="email_date"/>
+                <field name="email_message_id"/>
+                <field name="fund_account_id"/>
+                <field name="transaction_reference"/>
+                <field name="received_amount"/>
+                <field name="incoming_id"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_bank_email_form" model="ir.ui.view">
+        <field name="name">fund.bank.email.form</field>
+        <field name="model">fund.bank.email</field>
+        <field name="arch" type="xml">
+            <form string="Bank Email">
+                <header>
+                    <button name="action_parse" string="Parse" type="object" class="oe_highlight" invisible="state not in ['draft', 'failed']"/>
+                    <button name="action_create_incoming" string="Create Incoming Fund" type="object" class="oe_highlight" invisible="state != 'parsed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,parsed,created"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="fund_account_id"/>
+                            <field name="email_message_id"/>
+                            <field name="email_date"/>
+                            <field name="bank_name"/>
+                            <field name="masked_account_number"/>
+                        </group>
+                        <group>
+                            <field name="transaction_reference"/>
+                            <field name="transaction_date"/>
+                            <field name="received_amount"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="sender_info"/>
+                            <field name="incoming_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="raw_body"/>
+                        <field name="parse_error" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fund_bank_email" model="ir.actions.act_window">
+        <field name="name">Bank Email Imports</field>
+        <field name="res_model">fund.bank.email</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

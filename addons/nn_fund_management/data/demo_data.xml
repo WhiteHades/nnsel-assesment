@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="fund_dashboard_main" model="fund.dashboard">
+        <field name="name">Fund Dashboard</field>
+    </record>
+
+    <record id="expense_head_salary" model="fund.expense.head">
+        <field name="name">Salary</field>
+        <field name="code">SAL</field>
+    </record>
+    <record id="expense_head_rent" model="fund.expense.head">
+        <field name="name">Office Rent</field>
+        <field name="code">RENT</field>
+    </record>
+    <record id="expense_head_utility" model="fund.expense.head">
+        <field name="name">Utility Expenses</field>
+        <field name="code">UTIL</field>
+    </record>
+    <record id="expense_head_marketing" model="fund.expense.head">
+        <field name="name">Marketing Expenses</field>
+        <field name="code">MKT</field>
+    </record>
+    <record id="expense_head_admin" model="fund.expense.head">
+        <field name="name">Administrative Expenses</field>
+        <field name="code">ADMIN</field>
+    </record>
+
+    <record id="fund_account_demo_bank" model="fund.account">
+        <field name="name">Demo Bank Account</field>
+        <field name="account_type">bank</field>
+    </record>
+</odoo>

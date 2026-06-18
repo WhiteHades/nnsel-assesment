@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fund_account_list" model="ir.ui.view">
+        <field name="name">fund.account.list</field>
+        <field name="model">fund.account</field>
+        <field name="arch" type="xml">
+            <list string="Fund Accounts">
+                <field name="name"/>
+                <field name="account_type"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="total_received" sum="Total Received"/>
+                <field name="available_unassigned_balance" sum="Unassigned"/>
+                <field name="allocation_hold_amount" sum="On Hold"/>
+                <field name="total_assigned_amount" sum="Assigned"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_account_form" model="ir.ui.view">
+        <field name="name">fund.account.form</field>
+        <field name="model">fund.account</field>
+        <field name="arch" type="xml">
+            <form string="Fund Account">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="account_type"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Balances">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="total_received" readonly="1"/>
+                            <field name="available_unassigned_balance" readonly="1"/>
+                            <field name="allocation_hold_amount" readonly="1"/>
+                            <field name="total_assigned_amount" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Movements">
+                            <field name="movement_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="movement_type"/>
+                                    <field name="bucket"/>
+                                    <field name="direction"/>
+                                    <field name="amount"/>
+                                    <field name="source_model"/>
+                                    <field name="source_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_fund_account_search" model="ir.ui.view">
+        <field name="name">fund.account.search</field>
+        <field name="model">fund.account</field>
+        <field name="arch" type="xml">
+            <search string="Fund Accounts">
+                <field name="name"/>
+                <field name="account_type"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <group>
+                    <filter string="Type" name="group_type" context="{'group_by': 'account_type'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_fund_account" model="ir.actions.act_window">
+        <field name="name">Fund Accounts</field>
+        <field name="res_model">fund.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_fund_account_search"/>
+    </record>
+
+    <record id="view_fund_incoming_list" model="ir.ui.view">
+        <field name="name">fund.incoming.list</field>
+        <field name="model">fund.incoming</field>
+        <field name="arch" type="xml">
+            <list string="Incoming Funds" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="fund_account_id"/>
+                <field name="transaction_reference"/>
+                <field name="sender"/>
+                <field name="amount" sum="Amount"/>
+                <field name="state"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_incoming_form" model="ir.ui.view">
+        <field name="name">fund.incoming.form</field>
+        <field name="model">fund.incoming</field>
+        <field name="arch" type="xml">
+            <form string="Incoming Fund">
+                <header>
+                    <button name="action_confirm" string="Confirm" type="object" class="oe_highlight" groups="nn_fund_management.group_finance_user" invisible="state not in ['draft', 'pending_verification']"/>
+                    <button name="action_cancel" string="Cancel" type="object" groups="nn_fund_management.group_finance_user" invisible="state in ['cancelled']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pending_verification,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="fund_account_id"/>
+                            <field name="date"/>
+                            <field name="amount"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="transaction_reference"/>
+                            <field name="sender"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"/>
+                        <field name="attachment_ids" widget="many2many_binary"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_fund_incoming_search" model="ir.ui.view">
+        <field name="name">fund.incoming.search</field>
+        <field name="model">fund.incoming</field>
+        <field name="arch" type="xml">
+            <search string="Incoming Funds">
+                <field name="name"/>
+                <field name="transaction_reference"/>
+                <field name="fund_account_id"/>
+                <field name="sender"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Pending Verification" name="pending" domain="[('state', '=', 'pending_verification')]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <group>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Fund Account" name="group_account" context="{'group_by': 'fund_account_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_fund_incoming" model="ir.actions.act_window">
+        <field name="name">Incoming Funds</field>
+        <field name="res_model">fund.incoming</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_fund_incoming_search"/>
+    </record>
+
+    <record id="view_fund_expense_head_list" model="ir.ui.view">
+        <field name="name">fund.expense.head.list</field>
+        <field name="model">fund.expense.head</field>
+        <field name="arch" type="xml">
+            <list string="Expense Heads">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="total_allocated_fund" sum="Allocated"/>
+                <field name="available_fund" sum="Available"/>
+                <field name="requisition_hold" sum="Requisition Hold"/>
+                <field name="transfer_hold" sum="Transfer Hold"/>
+                <field name="approved_unspent_amount" sum="Approved Unspent"/>
+                <field name="total_spent_amount" sum="Spent"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_expense_head_form" model="ir.ui.view">
+        <field name="name">fund.expense.head.form</field>
+        <field name="model">fund.expense.head</field>
+        <field name="arch" type="xml">
+            <form string="Expense Head">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Balances">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="total_allocated_fund" readonly="1"/>
+                            <field name="available_fund" readonly="1"/>
+                            <field name="requisition_hold" readonly="1"/>
+                            <field name="transfer_hold" readonly="1"/>
+                            <field name="approved_unspent_amount" readonly="1"/>
+                            <field name="total_spent_amount" readonly="1"/>
+                            <field name="incoming_transfer_amount" readonly="1"/>
+                            <field name="outgoing_transfer_amount" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Movements">
+                            <field name="movement_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="movement_type"/>
+                                    <field name="bucket"/>
+                                    <field name="direction"/>
+                                    <field name="amount"/>
+                                    <field name="source_model"/>
+                                    <field name="source_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fund_expense_head" model="ir.actions.act_window">
+        <field name="name">Expense Heads</field>
+        <field name="res_model">fund.expense.head</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_fund_movement_list" model="ir.ui.view">
+        <field name="name">fund.movement.list</field>
+        <field name="model">fund.movement</field>
+        <field name="arch" type="xml">
+            <list string="Fund Movements" create="0" edit="0" delete="0">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="movement_type"/>
+                <field name="bucket"/>
+                <field name="direction"/>
+                <field name="amount" sum="Amount"/>
+                <field name="fund_account_id"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <field name="source_model"/>
+                <field name="source_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fund_movement_search" model="ir.ui.view">
+        <field name="name">fund.movement.search</field>
+        <field name="model">fund.movement</field>
+        <field name="arch" type="xml">
+            <search string="Fund Movements">
+                <field name="name"/>
+                <field name="movement_type"/>
+                <field name="fund_account_id"/>
+                <field name="project_id"/>
+                <field name="expense_head_id"/>
+                <group>
+                    <filter string="Type" name="group_type" context="{'group_by': 'movement_type'}"/>
+                    <filter string="Bucket" name="group_bucket" context="{'group_by': 'bucket'}"/>
+                    <filter string="Fund Account" name="group_account" context="{'group_by': 'fund_account_id'}"/>
+                    <filter string="Project" name="group_project" context="{'group_by': 'project_id'}"/>
+                    <filter string="Expense Head" name="group_expense" context="{'group_by': 'expense_head_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_fund_movement" model="ir.actions.act_window">
+        <field name="name">Fund Movements</field>
+        <field name="res_model">fund.movement</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_fund_movement_search"/>
+    </record>
+
+    <record id="view_project_project_form_fund_inherit" model="ir.ui.view">
+        <field name="name">project.project.form.fund.inherit</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Fund Balances" groups="nn_fund_management.group_fund_user">
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="fund_total_allocated" readonly="1"/>
+                            <field name="fund_available" readonly="1"/>
+                            <field name="fund_requisition_hold" readonly="1"/>
+                            <field name="fund_transfer_hold" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="fund_approved_unspent" readonly="1"/>
+                            <field name="fund_total_spent" readonly="1"/>
+                            <field name="fund_incoming_transfers" readonly="1"/>
+                            <field name="fund_outgoing_transfers" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="fund_movement_ids" readonly="1">
+                        <list>
+                            <field name="date"/>
+                            <field name="movement_type"/>
+                            <field name="bucket"/>
+                            <field name="direction"/>
+                            <field name="amount"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

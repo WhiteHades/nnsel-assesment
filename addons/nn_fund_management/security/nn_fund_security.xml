@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record model="res.groups.privilege" id="res_groups_privilege_fund_management">
+        <field name="name">Fund Management</field>
+        <field name="sequence">30</field>
+        <field name="category_id" ref="base.module_category_accounting"/>
+    </record>
+
+    <record id="group_fund_user" model="res.groups">
+        <field name="name">Fund User</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_finance_user" model="res.groups">
+        <field name="name">Finance User</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+        <field name="implied_ids" eval="[(4, ref('group_fund_user'))]"/>
+    </record>
+
+    <record id="group_gm_approver" model="res.groups">
+        <field name="name">GM Approver</field>
+        <field name="sequence">30</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+        <field name="implied_ids" eval="[(4, ref('group_fund_user'))]"/>
+    </record>
+
+    <record id="group_md_approver" model="res.groups">
+        <field name="name">MD Approver</field>
+        <field name="sequence">40</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+        <field name="implied_ids" eval="[(4, ref('group_fund_user'))]"/>
+    </record>
+
+    <record id="group_fund_administrator" model="res.groups">
+        <field name="name">Fund Administrator</field>
+        <field name="sequence">50</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+        <field name="implied_ids" eval="[
+            (4, ref('group_finance_user')),
+            (4, ref('group_gm_approver')),
+            (4, ref('group_md_approver'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+
+    <record id="group_self_approval_override" model="res.groups">
+        <field name="name">Self Approval Override</field>
+        <field name="sequence">60</field>
+        <field name="privilege_id" ref="res_groups_privilege_fund_management"/>
+    </record>
+
+    <data noupdate="1">
+        <record id="rule_fund_account_company" model="ir.rule">
+            <field name="name">Fund Account multi-company</field>
+            <field name="model_id" ref="model_fund_account"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_incoming_company" model="ir.rule">
+            <field name="name">Incoming Fund multi-company</field>
+            <field name="model_id" ref="model_fund_incoming"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_expense_head_company" model="ir.rule">
+            <field name="name">Expense Head multi-company</field>
+            <field name="model_id" ref="model_fund_expense_head"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_movement_company" model="ir.rule">
+            <field name="name">Fund Movement multi-company</field>
+            <field name="model_id" ref="model_fund_movement"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_allocation_company" model="ir.rule">
+            <field name="name">Allocation multi-company</field>
+            <field name="model_id" ref="model_fund_allocation"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_requisition_company" model="ir.rule">
+            <field name="name">Requisition multi-company</field>
+            <field name="model_id" ref="model_fund_requisition"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_bill_company" model="ir.rule">
+            <field name="name">Bill multi-company</field>
+            <field name="model_id" ref="model_fund_bill"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_transfer_company" model="ir.rule">
+            <field name="name">Transfer multi-company</field>
+            <field name="model_id" ref="model_fund_transfer"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_approval_rule_company" model="ir.rule">
+            <field name="name">Approval Rule multi-company</field>
+            <field name="model_id" ref="model_fund_approval_rule"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_approval_step_company" model="ir.rule">
+            <field name="name">Approval Step multi-company</field>
+            <field name="model_id" ref="model_fund_approval_step"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_approval_history_company" model="ir.rule">
+            <field name="name">Approval History multi-company</field>
+            <field name="model_id" ref="model_fund_approval_history"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_bank_email_company" model="ir.rule">
+            <field name="name">Bank Email multi-company</field>
+            <field name="model_id" ref="model_fund_bank_email"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_fund_dashboard_company" model="ir.rule">
+            <field name="name">Fund Dashboard multi-company</field>
+            <field name="model_id" ref="model_fund_dashboard"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+    </data>
+</odoo>
