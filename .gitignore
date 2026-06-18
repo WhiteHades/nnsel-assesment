@@ -1,0 +1,29 @@
+# local secrets
+.env
+.env.*
+odoo_pg_pass
+*.pem
+*.key
+
+# local runtime data
+odoo-data/
+postgres-data/
+filestore/
+*.log
+
+# python and odoo cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# local tooling
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# assessment source binary
+Technical Assessment.pdf
