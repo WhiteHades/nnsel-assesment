@@ -47,7 +47,7 @@ The implementation will use a ledger-backed movement model. Workflow actions cre
 
 ## Implementation decisions
 
-- Use Odoo 18 Community for the Dockerized development environment.
+- Use Odoo 19 Community for the Dockerized development environment.
 - Use the official Odoo Docker image with PostgreSQL, mounted custom addons, and a local config file.
 - Build one custom addon under `addons/nn_fund_management`.
 - Depend on `base`, `mail`, and `project`.

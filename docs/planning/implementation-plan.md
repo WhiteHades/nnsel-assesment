@@ -8,7 +8,7 @@ The implementation should be small enough to explain in an interview and complet
 
 ## Assumptions
 
-- Odoo 18 Community is acceptable.
+- Odoo 19 Community is used because the local Odoo repository is branch `19.0`.
 - The project target will use Odoo's `project.project` model.
 - Expense heads will be custom records in this module.
 - Bills will use a custom model in the first delivery.
@@ -17,8 +17,7 @@ The implementation should be small enough to explain in an interview and complet
 
 ## Source references
 
-- Odoo 18 module manifests: https://www.odoo.com/documentation/18.0/th/developer/reference/backend/module.html
-- Odoo 18 developer reference and security topics: https://www.odoo.com/documentation/18.0/th/developer.html
+- Local Odoo 19 source: `/home/efaz/Codes/odoo`
 - Official Odoo Docker image: https://hub.docker.com/_/odoo
 
 ## Success criteria

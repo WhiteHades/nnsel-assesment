@@ -68,6 +68,5 @@ Use Odoo models, access control lists, record rules, and server-side checks. Avo
 
 Relevant references:
 
-- Odoo 18 module manifest documentation: https://www.odoo.com/documentation/18.0/th/developer/reference/backend/module.html
-- Odoo 18 security documentation: https://www.odoo.com/documentation/18.0/th/developer.html
+- Local Odoo 19 source reference: `/home/efaz/Codes/odoo`
 - Odoo Docker official image: https://hub.docker.com/_/odoo
