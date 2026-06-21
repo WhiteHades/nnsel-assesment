@@ -44,9 +44,21 @@ Target length: 8 to 12 minutes.
 10. Demonstrate expense-head funding and wrong-head bill protection.
 11. Show dashboard totals, activities, ledger movements, and approval history.
 12. Show backend tests passing or explain the latest recorded test result.
-13. Explain what AI helped with: PDF extraction, planning, test coverage, implementation review, documentation, and presentation polish.
+13. Explain AI use with the checklist below.
 14. Explain what you understand: Odoo models, ACLs, record rules, workflow methods, ledger accounting, approval rules, and Docker runtime.
-15. Close with any known limitation: Vercel hosts only the static presentation, while Odoo and PostgreSQL run locally.
+15. Close with known limitations: Vercel hosts only the static presentation, Odoo and PostgreSQL run locally, and the bank email feature is a parser prototype.
+
+## AI-use checklist
+
+Cover these points in plain language:
+
+- AI tools used: Codex, `lp-paddle`, and any local code search or verification tools used during the session.
+- AI-assisted parts: assessment extraction, planning, domain modeling, implementation review, test ideas, documentation, and presentation polish.
+- Prompt summaries: asked AI to extract the PDF safely, map requirements into Odoo workflows, review double-spending risks, add tests, improve handoff docs, and prepare the demo script.
+- Errors found in AI-generated or AI-suggested code: incomplete server-side guards, missing edit locks after ledger movements, cancellation edge cases, and stale or incomplete handoff claims.
+- Candidate changes: verified requirements against the assessment, reviewed Odoo source patterns, kept the ledger design, added server-side checks, ran tests, and reviewed diffs before committing.
+- Understood parts: computed balance buckets, append-only movements, approval steps, ACLs, record rules, workflow methods, Docker runtime, and how to add or remove approval rules.
+- Known limitations: custom bill model instead of Odoo Vendor Bills, local-only Odoo runtime, prototype bank email parsing, and no production deployment hardening.
 
 ## Commands to show
 

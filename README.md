@@ -12,7 +12,7 @@
   <img alt="Odoo 19" src="https://img.shields.io/badge/Odoo-19-714B67">
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-336791">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-local-2496ED">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-16%20passing-1F8A4C">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-24%20passing-1F8A4C">
   <img alt="Vercel" src="https://img.shields.io/badge/Vercel-presentation-111111">
 </p>
 
@@ -41,6 +41,16 @@ The business system runs locally with Docker Compose. The hosted Vercel site is 
 - Vite, React, Tailwind, Playwright, and shadcn-style components for the presentation site
 - No paid services required for the local Odoo runtime
 
+## Required Dependencies
+
+- Odoo modules: `mail` and `project`
+- Docker and Docker Compose for the local Odoo/PostgreSQL runtime
+- PostgreSQL 16 through the provided Compose service
+- Node.js and npm for the static presentation in `presentation/`
+- Playwright Chromium for presentation smoke tests
+
+The addon manifest declares the Odoo dependencies in `addons/nn_fund_management/__manifest__.py`.
+
 ## Run Locally
 
 ```bash
@@ -55,6 +65,14 @@ http://localhost:8069
 ```
 
 Create a database, install `NN Fund Management`, then open the `Fund Management` app menu.
+
+## Configuration
+
+- Copy `.env.example` to `.env` before starting Docker Compose.
+- Keep Odoo and PostgreSQL local for this assessment unless you prepare a separate production deployment plan.
+- Assign users to the Fund User, Finance User, GM Approver, MD Approver, or Fund Administrator groups from Odoo settings.
+- Review approval rules under Fund Management > Configuration > Approval Rules. Default rules require General Manager approval followed by Managing Director approval for allocations, requisitions, and transfers.
+- Use the demo expense heads and demo bank account as starter data, or create your own fund accounts and expense heads from Master Data.
 
 ## Verify
 
@@ -72,7 +90,7 @@ TEST_DB=nnsel_final_$(date +%s)
 docker compose run --rm odoo odoo -c /etc/odoo/odoo.conf -d "$TEST_DB" --init nn_fund_management --test-enable --test-tags /nn_fund_management --stop-after-init --without-demo=True --log-level=test
 ```
 
-Latest backend result: 14 post-test cases, 16 module tests, 0 failures, 0 errors.
+Latest backend result: 22 post-tests, 24 module tests, 0 failures, 0 errors.
 
 Presentation site:
 
@@ -115,6 +133,22 @@ https://nnsel-assesment.vercel.app
 - Multi-company record rules
 - Bank email parser prototype that creates pending incoming funds
 - Dashboard totals, held money, and pending approval count
+
+## Assumptions
+
+- The assessment allows a custom bill model, so `fund.bill` is used instead of full Odoo Vendor Bill integration.
+- The append-only `fund.movement` ledger is the source of truth for balances.
+- Fund-account money is tracked in aggregate unassigned balance, not by tracing each outgoing movement back to a specific incoming receipt.
+- General Manager and Managing Director approval rules are configurable through records, not hardcoded user IDs.
+- Vercel is used only for the static reviewer presentation. It is not an Odoo hosting target.
+
+## Known Limitations
+
+- The bank email feature is a parser prototype for copied email bodies, not a live inbox integration.
+- Bill control uses the custom `fund.bill` model and does not create Odoo accounting journal entries.
+- Approved transfers are not cancelled after destination funding is created. Corrections should be handled with a new reverse transfer or finance review workflow.
+- The Docker configuration is intended for local assessment review, not production hardening.
+- The required facecam walkthrough must be recorded and uploaded by the candidate because it needs the candidate's voice and face.
 
 ## Demo Path
 

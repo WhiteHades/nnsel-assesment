@@ -85,4 +85,4 @@ npm run build
 npm run test:e2e
 ```
 
-Latest result: 14 post-test cases, 16 module tests, 0 failures, 0 errors.
+Latest result: 22 post-tests, 24 module tests, 0 failures, 0 errors.
