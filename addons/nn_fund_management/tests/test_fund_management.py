@@ -15,6 +15,11 @@ class TestFundManagement(TransactionCase):
             login='fund_user',
             groups='base.group_user,nn_fund_management.group_fund_user',
         )
+        cls.other_fund_user = new_test_user(
+            cls.env,
+            login='other_fund_user',
+            groups='base.group_user,nn_fund_management.group_fund_user',
+        )
         cls.finance_user = new_test_user(
             cls.env,
             login='finance_user',
@@ -199,6 +204,128 @@ class TestFundManagement(TransactionCase):
             ('purpose', '=', 'cancel'),
         ]), 1)
 
+    def test_confirmed_incoming_cancel_is_blocked_after_money_is_assigned(self):
+        incoming = self._receive(amount=250000, reference='CANCEL-ASSIGNED-001')
+        self._allocate_project_a(200000)
+        with self.assertRaises(ValidationError):
+            incoming.with_user(self.finance_user).action_cancel()
+        self.assertEqual(incoming.state, 'confirmed')
+        self.assertEqual(self.account.available_unassigned_balance, 50000)
+        self.assertEqual(self.project_a.fund_available, 200000)
+
+    def test_financial_fields_and_state_are_locked_after_workflow_starts(self):
+        self._receive()
+        allocation = self.env['fund.allocation'].with_user(self.fund_user).create({
+            'fund_account_id': self.account.id,
+            'project_id': self.project_a.id,
+            'amount': 300000,
+            'purpose': 'Immutable allocation',
+            'company_id': self.company.id,
+        })
+        allocation.action_submit()
+        with self.assertRaises(UserError):
+            allocation.with_user(self.fund_user).write({'amount': 400000})
+        with self.assertRaises(AccessError):
+            allocation.with_user(self.fund_user).write({'state': 'approved'})
+        self._approve(allocation)
+        with self.assertRaises(UserError):
+            allocation.with_user(self.finance_user).write({'project_id': self.project_b.id})
+
+        requisition = self.env['fund.requisition'].with_user(self.fund_user).create({
+            'project_id': self.project_a.id,
+            'amount': 100000,
+            'purpose': 'Immutable requisition',
+            'company_id': self.company.id,
+        })
+        requisition.action_submit()
+        self._approve(requisition)
+        with self.assertRaises(UserError):
+            requisition.with_user(self.fund_user).write({'amount': 150000})
+
+        bill = self.env['fund.bill'].with_user(self.finance_user).create({
+            'requisition_id': requisition.id,
+            'project_id': self.project_a.id,
+            'amount': 50000,
+            'vendor': 'Immutable Vendor',
+            'company_id': self.company.id,
+        })
+        bill.action_post()
+        with self.assertRaises(UserError):
+            bill.with_user(self.finance_user).write({'amount': 10000})
+        with self.assertRaises(AccessError):
+            bill.with_user(self.finance_user).write({'state': 'draft'})
+
+    def test_final_states_cannot_be_created_directly(self):
+        self._receive()
+        with self.assertRaises(AccessError):
+            self.env['fund.allocation'].with_user(self.fund_user).create({
+                'fund_account_id': self.account.id,
+                'project_id': self.project_a.id,
+                'amount': 100000,
+                'purpose': 'Bypass workflow',
+                'company_id': self.company.id,
+                'state': 'approved',
+            })
+
+    def test_unrelated_user_cannot_cancel_pending_request(self):
+        self._receive()
+        allocation = self.env['fund.allocation'].with_user(self.fund_user).create({
+            'fund_account_id': self.account.id,
+            'project_id': self.project_a.id,
+            'amount': 100000,
+            'purpose': 'Requester-owned cancellation',
+            'company_id': self.company.id,
+        })
+        allocation.action_submit()
+        with self.assertRaises(AccessError):
+            allocation.with_user(self.other_fund_user).action_cancel()
+        self.assertEqual(allocation.state, 'submitted')
+        allocation.with_user(self.fund_user).action_cancel()
+        self.assertEqual(allocation.state, 'cancelled')
+        self.assertEqual(self.account.available_unassigned_balance, 1000000)
+
+    def test_audit_records_cannot_be_modified_or_deleted(self):
+        incoming = self._receive(amount=100000, reference='AUDIT-001')
+        movement = self.env['fund.movement'].search([
+            ('source_model', '=', 'fund.incoming'),
+            ('source_id', '=', incoming.id),
+            ('purpose', '=', 'confirm'),
+        ], limit=1)
+        history = self.env['fund.approval.history'].search([
+            ('source_model', '=', 'fund.incoming'),
+            ('source_id', '=', incoming.id),
+        ], limit=1)
+        with self.assertRaises(UserError):
+            movement.with_user(self.admin).write({'amount': 1})
+        with self.assertRaises(UserError):
+            history.with_user(self.admin).unlink()
+
+    def test_multi_company_record_rules_hide_other_company_fund_records(self):
+        other_company = self.env['res.company'].create({'name': 'Other Fund Company'})
+        other_account = self.env['fund.account'].create({
+            'name': 'Other Company Bank',
+            'account_type': 'bank',
+            'company_id': other_company.id,
+        })
+        visible_accounts = self.env['fund.account'].with_user(self.fund_user).search([('id', '=', other_account.id)])
+        self.assertFalse(visible_accounts)
+        with self.assertRaises(AccessError):
+            other_account.with_user(self.fund_user).read(['name'])
+
+    def test_cancelled_request_with_movements_cannot_be_deleted(self):
+        self._receive()
+        allocation = self.env['fund.allocation'].with_user(self.fund_user).create({
+            'fund_account_id': self.account.id,
+            'project_id': self.project_a.id,
+            'amount': 100000,
+            'purpose': 'Cancelled but audited',
+            'company_id': self.company.id,
+        })
+        allocation.action_submit()
+        allocation.with_user(self.fund_user).action_cancel()
+        with self.assertRaises(UserError):
+            allocation.with_user(self.admin).unlink()
+
     def test_demo_flow_blocks_double_spending(self):
         self._receive()
         allocation = self.env['fund.allocation'].with_user(self.fund_user).create({
@@ -376,12 +503,39 @@ class TestFundManagement(TransactionCase):
             'company_id': self.company.id,
         })
         bill.action_post()
-        requisition.action_close()
+        with self.assertRaises(AccessError):
+            requisition.with_user(self.fund_user).action_close()
+        requisition.with_user(self.finance_user).action_close()
         self.assertEqual(requisition.state, 'closed')
         self.assertEqual(requisition.remaining_billable_amount, 0)
         self.assertEqual(requisition.released_amount, 25000)
         self.assertEqual(self.project_a.fund_available, 125000)
         self.assertEqual(self.project_a.fund_approved_unspent, 0)
+
+    def test_cancelled_requisition_blocks_late_bill_reversal(self):
+        self._receive()
+        self._allocate_project_a(200000)
+        requisition = self.env['fund.requisition'].with_user(self.fund_user).create({
+            'project_id': self.project_a.id,
+            'amount': 100000,
+            'purpose': 'Cancelled after partial spend',
+            'company_id': self.company.id,
+        })
+        requisition.action_submit()
+        self._approve(requisition)
+        bill = self.env['fund.bill'].with_user(self.finance_user).create({
+            'requisition_id': requisition.id,
+            'project_id': self.project_a.id,
+            'amount': 75000,
+            'vendor': 'Vendor A',
+            'company_id': self.company.id,
+        })
+        bill.action_post()
+        requisition.with_user(self.finance_user).action_cancel()
+        self.assertEqual(requisition.state, 'cancelled')
+        self.assertEqual(self.project_a.fund_approved_unspent, 0)
+        with self.assertRaises(ValidationError):
+            bill.with_user(self.finance_user).action_reverse()
 
     def test_transfer_variants_and_held_money_cannot_transfer_again(self):
         self._receive()

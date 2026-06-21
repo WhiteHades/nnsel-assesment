@@ -9,7 +9,7 @@ access_fund_expense_head_user,fund.expense.head.user,model_fund_expense_head,gro
 access_fund_expense_head_finance,fund.expense.head.finance,model_fund_expense_head,group_finance_user,1,1,1,0
 access_fund_expense_head_admin,fund.expense.head.admin,model_fund_expense_head,group_fund_administrator,1,1,1,1
 access_fund_movement_user,fund.movement.user,model_fund_movement,group_fund_user,1,0,0,0
-access_fund_movement_admin,fund.movement.admin,model_fund_movement,group_fund_administrator,1,1,1,0
+access_fund_movement_admin,fund.movement.admin,model_fund_movement,group_fund_administrator,1,0,0,0
 access_fund_allocation_user,fund.allocation.user,model_fund_allocation,group_fund_user,1,1,1,0
 access_fund_allocation_finance,fund.allocation.finance,model_fund_allocation,group_finance_user,1,1,1,0
 access_fund_allocation_admin,fund.allocation.admin,model_fund_allocation,group_fund_administrator,1,1,1,1
@@ -25,9 +25,9 @@ access_fund_transfer_admin,fund.transfer.admin,model_fund_transfer,group_fund_ad
 access_fund_approval_rule_user,fund.approval.rule.user,model_fund_approval_rule,group_fund_user,1,0,0,0
 access_fund_approval_rule_admin,fund.approval.rule.admin,model_fund_approval_rule,group_fund_administrator,1,1,1,1
 access_fund_approval_step_user,fund.approval.step.user,model_fund_approval_step,group_fund_user,1,0,0,0
-access_fund_approval_step_admin,fund.approval.step.admin,model_fund_approval_step,group_fund_administrator,1,1,1,1
+access_fund_approval_step_admin,fund.approval.step.admin,model_fund_approval_step,group_fund_administrator,1,0,0,0
 access_fund_approval_history_user,fund.approval.history.user,model_fund_approval_history,group_fund_user,1,0,0,0
-access_fund_approval_history_admin,fund.approval.history.admin,model_fund_approval_history,group_fund_administrator,1,1,1,1
+access_fund_approval_history_admin,fund.approval.history.admin,model_fund_approval_history,group_fund_administrator,1,0,0,0
 access_fund_bank_email_finance,fund.bank.email.finance,model_fund_bank_email,group_finance_user,1,1,1,0
 access_fund_bank_email_admin,fund.bank.email.admin,model_fund_bank_email,group_fund_administrator,1,1,1,1
 access_fund_dashboard_user,fund.dashboard.user,model_fund_dashboard,group_fund_user,1,0,0,0

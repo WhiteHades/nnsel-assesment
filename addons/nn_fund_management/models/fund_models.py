@@ -12,6 +12,8 @@ TARGET_BUCKETS = {
     'spent': 'target_spent',
 }
 
+INTERNAL_WRITE_CONTEXT = 'nn_fund_management_internal_write'
+
 
 class FundMovement(models.Model):
     _name = 'fund.movement'
@@ -88,7 +90,14 @@ class FundMovement(models.Model):
                 raise ValidationError(_('A fund movement must reference exactly one fund account, project, or expense head.'))
 
     def unlink(self):
+        if self.env.context.get('module_uninstall'):
+            return super().unlink()
         raise UserError(_('Fund movements are audit records and cannot be deleted.'))
+
+    def write(self, vals):
+        if not self.env.context.get(INTERNAL_WRITE_CONTEXT):
+            raise UserError(_('Fund movements are audit records and cannot be modified.'))
+        return super().write(vals)
 
 
 class FundApprovalRule(models.Model):
@@ -185,6 +194,16 @@ class FundApprovalStep(models.Model):
             self.approver_group_id and self.approver_group_id in user.all_group_ids
         )
 
+    def write(self, vals):
+        if not self.env.context.get(INTERNAL_WRITE_CONTEXT):
+            raise UserError(_('Approval steps can only be changed through workflow actions.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if self.env.context.get('module_uninstall'):
+            return super().unlink()
+        raise UserError(_('Approval steps are audit records and cannot be deleted.'))
+
 
 class FundApprovalHistory(models.Model):
     _name = 'fund.approval.history'
@@ -220,6 +239,16 @@ class FundApprovalHistory(models.Model):
     company_id = fields.Many2one('res.company', required=True, default=lambda self: self.env.company)
     currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
 
+    def write(self, vals):
+        if not self.env.context.get(INTERNAL_WRITE_CONTEXT):
+            raise UserError(_('Approval history is an audit record and cannot be modified.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if self.env.context.get('module_uninstall'):
+            return super().unlink()
+        raise UserError(_('Approval history is an audit record and cannot be deleted.'))
+
 
 class FundRequestMixin(models.AbstractModel):
     _name = 'fund.request.mixin'
@@ -235,6 +264,31 @@ class FundRequestMixin(models.AbstractModel):
         if not (self.env.user.has_group(xmlid) or self._is_admin()):
             raise AccessError(message)
 
+    def _internal_write(self, vals):
+        self.ensure_one()
+        return self.with_context(**{INTERNAL_WRITE_CONTEXT: True}).write(vals)
+
+    def _guard_financial_write(self, vals, protected_fields, locked_states=None):
+        if self.env.context.get(INTERNAL_WRITE_CONTEXT):
+            return
+        if 'state' in vals:
+            raise AccessError(_('Workflow status can only be changed through workflow actions.'))
+        changed = set(vals) & set(protected_fields)
+        if not changed:
+            return
+        locked_states = set(locked_states or [])
+        for record in self:
+            if not locked_states or record.state in locked_states:
+                raise UserError(_('Financial fields cannot be changed after workflow processing has started.'))
+
+    def _check_cancel_allowed(self):
+        self.ensure_one()
+        if self._is_finance():
+            return
+        if getattr(self, 'requested_by_id', False) == self.env.user and self.state in ('draft', 'submitted', 'gm_approved'):
+            return
+        raise AccessError(_('Only the requester, finance users, or fund administrators can cancel this request.'))
+
     def _check_positive_amount(self):
         for record in self:
             if record.amount <= 0:
@@ -245,6 +299,10 @@ class FundRequestMixin(models.AbstractModel):
             self.env.cr.execute('SELECT id FROM project_project WHERE id = ANY(%s) FOR UPDATE', [project.ids])
         if expense:
             self.env.cr.execute('SELECT id FROM fund_expense_head WHERE id = ANY(%s) FOR UPDATE', [expense.ids])
+
+    def _lock_requisition_scope(self, requisition):
+        if requisition:
+            self.env.cr.execute('SELECT id FROM fund_requisition WHERE id = ANY(%s) FOR UPDATE', [requisition.ids])
 
     def _movement_exists(self, purpose):
         self.ensure_one()
@@ -435,7 +493,7 @@ class FundRequestMixin(models.AbstractModel):
         self.ensure_one()
         step = self._pending_step()
         self._check_current_approver(step)
-        step.sudo().write({
+        step.sudo().with_context(**{INTERNAL_WRITE_CONTEXT: True}).write({
             'state': 'approved',
             'decision_user_id': self.env.user.id,
             'decision_date': fields.Datetime.now(),
@@ -450,14 +508,14 @@ class FundRequestMixin(models.AbstractModel):
         self.ensure_one()
         step = self._pending_step()
         self._check_current_approver(step)
-        step.sudo().write({
+        step.sudo().with_context(**{INTERNAL_WRITE_CONTEXT: True}).write({
             'state': 'rejected',
             'decision_user_id': self.env.user.id,
             'decision_date': fields.Datetime.now(),
             'comment': comment,
         })
         previous = self.state
-        self.write({'state': 'rejected'})
+        self._internal_write({'state': 'rejected'})
         self._history('reject', previous, 'rejected', comment=comment, approval_level=step.name)
         self.message_post(body=_('%s rejected by %s.') % (step.name, self.env.user.display_name))
         self.activity_unlink(['mail.mail_activity_data_todo'])
@@ -614,9 +672,21 @@ class FundIncoming(models.Model):
     def create(self, vals_list):
         seq = self.env['ir.sequence']
         for vals in vals_list:
+            if vals.get('state') not in (None, False, 'draft', 'pending_verification'):
+                raise AccessError(_('Incoming funds must be confirmed through the workflow.'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = seq.next_by_code('fund.incoming') or _('New')
         return super().create(vals_list)
+
+    def write(self, vals):
+        self._guard_financial_write(vals, {
+            'fund_account_id',
+            'date',
+            'amount',
+            'transaction_reference',
+            'company_id',
+        }, locked_states={'confirmed', 'cancelled'})
+        return super().write(vals)
 
     def action_confirm(self):
         self._check_group('nn_fund_management.group_finance_user', _('Only finance users can confirm incoming funds.'))
@@ -633,7 +703,7 @@ class FundIncoming(models.Model):
                 fund_account=incoming.fund_account_id,
                 description=incoming.transaction_reference,
             )
-            incoming.write({'state': 'confirmed'})
+            incoming._internal_write({'state': 'confirmed'})
             incoming._history('approve', previous, 'confirmed', amount=incoming.amount, fund_account=incoming.fund_account_id)
             incoming.message_post(body=_('Incoming fund confirmed.'))
 
@@ -645,6 +715,10 @@ class FundIncoming(models.Model):
                 continue
             previous = incoming.state
             if incoming.state == 'confirmed':
+                incoming.fund_account_id._lock_company_scope()
+                incoming.fund_account_id.invalidate_recordset(['available_unassigned_balance'])
+                if incoming.amount > incoming.fund_account_id.available_unassigned_balance:
+                    raise ValidationError(_('This incoming fund cannot be cancelled because its money has already been assigned or spent. Reverse dependent transactions first.'))
                 incoming._create_movement(
                     purpose='cancel',
                     movement_type='incoming_cancel',
@@ -654,7 +728,7 @@ class FundIncoming(models.Model):
                     fund_account=incoming.fund_account_id,
                     description=incoming.transaction_reference,
                 )
-            incoming.write({'state': 'cancelled'})
+            incoming._internal_write({'state': 'cancelled'})
             incoming._history('cancel', previous, 'cancelled', amount=incoming.amount, fund_account=incoming.fund_account_id)
 
     def unlink(self):
@@ -696,9 +770,22 @@ class FundAllocation(models.Model):
     def create(self, vals_list):
         seq = self.env['ir.sequence']
         for vals in vals_list:
+            if vals.get('state') not in (None, False, 'draft'):
+                raise AccessError(_('Allocations must be submitted and approved through the workflow.'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = seq.next_by_code('fund.allocation') or _('New')
         return super().create(vals_list)
+
+    def write(self, vals):
+        self._guard_financial_write(vals, {
+            'fund_account_id',
+            'project_id',
+            'expense_head_id',
+            'amount',
+            'requested_by_id',
+            'company_id',
+        }, locked_states={'submitted', 'gm_approved', 'approved', 'rejected', 'cancelled'})
+        return super().write(vals)
 
     @api.constrains('project_id', 'expense_head_id')
     def _check_single_target(self):
@@ -719,7 +806,7 @@ class FundAllocation(models.Model):
             allocation._create_movement('submit_unassigned', 'allocation_submit', 'account_unassigned', 'out', allocation.amount, fund_account=allocation.fund_account_id)
             allocation._create_movement('submit_hold', 'allocation_submit', 'account_allocation_hold', 'in', allocation.amount, fund_account=allocation.fund_account_id)
             previous = allocation.state
-            allocation.write({'state': 'submitted'})
+            allocation._internal_write({'state': 'submitted'})
             allocation._create_approval_steps('allocation', rules=rules)
             allocation._history('submit', previous, 'submitted', amount=allocation.amount, fund_account=allocation.fund_account_id)
             allocation.message_post(body=_('Allocation submitted.'))
@@ -731,12 +818,12 @@ class FundAllocation(models.Model):
             previous = allocation.state
             allocation._approve_step(comment=comment)
             if allocation._pending_step():
-                allocation.write({'state': 'gm_approved'})
+                allocation._internal_write({'state': 'gm_approved'})
                 allocation._schedule_current_approver_activity()
             else:
                 allocation._create_movement('approve_hold', 'allocation_approve', 'account_allocation_hold', 'out', allocation.amount, fund_account=allocation.fund_account_id)
                 allocation._create_target_movement('approve_target', 'allocation_approve', 'available', 'in', allocation.amount, description=allocation.purpose)
-                allocation.write({'state': 'approved'})
+                allocation._internal_write({'state': 'approved'})
                 allocation._history('approve', previous, 'approved', amount=allocation.amount, fund_account=allocation.fund_account_id)
                 allocation.message_post(body=_('Allocation approved and assigned.'))
 
@@ -749,6 +836,7 @@ class FundAllocation(models.Model):
 
     def action_cancel(self):
         for allocation in self:
+            allocation._check_cancel_allowed()
             if allocation.state == 'approved' and not allocation._is_finance():
                 raise AccessError(_('Only finance users can cancel approved allocations.'))
             if allocation.state in ('rejected', 'cancelled'):
@@ -762,9 +850,9 @@ class FundAllocation(models.Model):
                     raise ValidationError(_('This approved allocation cannot be cancelled because the target balance has already been used.'))
                 allocation._create_target_movement('cancel_target', 'allocation_release', 'available', 'out', allocation.amount, project=project, expense=expense)
                 allocation._create_movement('cancel_unassigned', 'allocation_release', 'account_unassigned', 'in', allocation.amount, fund_account=allocation.fund_account_id)
-                allocation.write({'state': 'cancelled'})
+                allocation._internal_write({'state': 'cancelled'})
             else:
-                allocation.write({'state': 'cancelled'})
+                allocation._internal_write({'state': 'cancelled'})
             allocation._history('cancel', previous, 'cancelled', amount=allocation.amount, fund_account=allocation.fund_account_id)
 
     def _release_hold(self, final_state):
@@ -772,12 +860,12 @@ class FundAllocation(models.Model):
         self._create_movement(final_state + '_hold', 'allocation_release', 'account_allocation_hold', 'out', self.amount, fund_account=self.fund_account_id)
         self._create_movement(final_state + '_unassigned', 'allocation_release', 'account_unassigned', 'in', self.amount, fund_account=self.fund_account_id)
         previous = self.state
-        self.write({'state': final_state})
+        self._internal_write({'state': final_state})
         self._history('cancel' if final_state == 'cancelled' else 'reject', previous, final_state, amount=self.amount, fund_account=self.fund_account_id)
 
     def unlink(self):
         for allocation in self:
-            if allocation.state not in ('draft', 'cancelled'):
+            if allocation.state != 'draft' or allocation._movement_exists('submit_unassigned') or allocation.approval_history_ids:
                 raise UserError(_('Submitted financial requests cannot be deleted. Cancel or reject them instead.'))
         return super().unlink()
 
@@ -819,9 +907,22 @@ class FundRequisition(models.Model):
     def create(self, vals_list):
         seq = self.env['ir.sequence']
         for vals in vals_list:
+            if vals.get('state') not in (None, False, 'draft'):
+                raise AccessError(_('Requisitions must be submitted and approved through the workflow.'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = seq.next_by_code('fund.requisition') or _('New')
         return super().create(vals_list)
+
+    def write(self, vals):
+        self._guard_financial_write(vals, {
+            'project_id',
+            'expense_head_id',
+            'amount',
+            'released_amount',
+            'requested_by_id',
+            'company_id',
+        }, locked_states={'submitted', 'gm_approved', 'approved', 'rejected', 'cancelled', 'closed'})
+        return super().write(vals)
 
     @api.constrains('project_id', 'expense_head_id')
     def _check_single_target(self):
@@ -849,7 +950,7 @@ class FundRequisition(models.Model):
             requisition._create_target_movement('submit_available', 'requisition_submit', 'available', 'out', requisition.amount, project=project, expense=expense)
             requisition._create_target_movement('submit_hold', 'requisition_submit', 'requisition_hold', 'in', requisition.amount, project=project, expense=expense)
             previous = requisition.state
-            requisition.write({'state': 'submitted'})
+            requisition._internal_write({'state': 'submitted'})
             requisition._create_approval_steps('requisition', rules=rules)
             requisition._history('submit', previous, 'submitted', amount=requisition.amount, project=project, expense_head=expense)
             requisition.message_post(body=_('Requisition submitted.'))
@@ -861,13 +962,13 @@ class FundRequisition(models.Model):
             previous = requisition.state
             requisition._approve_step(comment=comment)
             if requisition._pending_step():
-                requisition.write({'state': 'gm_approved'})
+                requisition._internal_write({'state': 'gm_approved'})
                 requisition._schedule_current_approver_activity()
             else:
                 project, expense = requisition._target_values()
                 requisition._create_target_movement('approve_hold', 'requisition_approve', 'requisition_hold', 'out', requisition.amount, project=project, expense=expense)
                 requisition._create_target_movement('approve_reserved', 'requisition_approve', 'reserved', 'in', requisition.amount, project=project, expense=expense)
-                requisition.write({'state': 'approved'})
+                requisition._internal_write({'state': 'approved'})
                 requisition._history('approve', previous, 'approved', amount=requisition.amount, project=project, expense_head=expense)
                 requisition.message_post(body=_('Requisition approved.'))
 
@@ -880,6 +981,7 @@ class FundRequisition(models.Model):
 
     def action_cancel(self):
         for requisition in self:
+            requisition._check_cancel_allowed()
             if requisition.state == 'approved' and not requisition._is_finance():
                 raise AccessError(_('Only finance users can cancel approved requisitions.'))
             if requisition.state in ('rejected', 'cancelled', 'closed'):
@@ -890,18 +992,19 @@ class FundRequisition(models.Model):
             elif requisition.state == 'approved':
                 requisition._release_unused('cancelled')
             else:
-                requisition.write({'state': 'cancelled'})
+                requisition._internal_write({'state': 'cancelled'})
             requisition._history('cancel', previous, 'cancelled')
 
     def action_close(self):
         for requisition in self:
             if requisition.state != 'approved':
                 raise UserError(_('Only approved requisitions can be closed.'))
+            requisition._check_group('nn_fund_management.group_finance_user', _('Only finance users can close approved requisitions.'))
             previous = requisition.state
             if requisition.remaining_billable_amount:
                 requisition._release_unused('closed')
             else:
-                requisition.write({'state': 'closed'})
+                requisition._internal_write({'state': 'closed'})
             requisition._history('close', previous, 'closed')
 
     def _release_hold(self, final_state):
@@ -910,7 +1013,7 @@ class FundRequisition(models.Model):
         self._create_target_movement(final_state + '_hold', 'requisition_release', 'requisition_hold', 'out', self.amount, project=project, expense=expense)
         self._create_target_movement(final_state + '_available', 'requisition_release', 'available', 'in', self.amount, project=project, expense=expense)
         previous = self.state
-        self.write({'state': final_state})
+        self._internal_write({'state': final_state})
         self._history('cancel' if final_state == 'cancelled' else 'reject', previous, final_state, project=project, expense_head=expense)
 
     def _release_unused(self, final_state):
@@ -920,12 +1023,12 @@ class FundRequisition(models.Model):
         if amount:
             self._create_target_movement(final_state + '_reserved', 'requisition_release', 'reserved', 'out', amount, project=project, expense=expense)
             self._create_target_movement(final_state + '_available', 'requisition_release', 'available', 'in', amount, project=project, expense=expense)
-            self.released_amount += amount
-        self.write({'state': final_state})
+            self._internal_write({'released_amount': self.released_amount + amount})
+        self._internal_write({'state': final_state})
 
     def unlink(self):
         for requisition in self:
-            if requisition.state not in ('draft', 'cancelled'):
+            if requisition.state != 'draft' or requisition._movement_exists('submit_available') or requisition.approval_history_ids:
                 raise UserError(_('Submitted financial requests cannot be deleted. Cancel or reject them instead.'))
         return super().unlink()
 
@@ -957,6 +1060,9 @@ class FundBill(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         seq = self.env['ir.sequence']
+        for vals in vals_list:
+            if vals.get('state') not in (None, False, 'draft'):
+                raise AccessError(_('Bills must be posted through the workflow.'))
         records = super().create(vals_list)
         for record in records:
             if record.name == _('New'):
@@ -965,6 +1071,16 @@ class FundBill(models.Model):
                 record.project_id = record.requisition_id.project_id
                 record.expense_head_id = record.requisition_id.expense_head_id
         return records
+
+    def write(self, vals):
+        self._guard_financial_write(vals, {
+            'requisition_id',
+            'project_id',
+            'expense_head_id',
+            'amount',
+            'company_id',
+        }, locked_states={'posted', 'reversed', 'cancelled'})
+        return super().write(vals)
 
     @api.constrains('project_id', 'expense_head_id', 'requisition_id')
     def _check_requisition_target(self):
@@ -981,15 +1097,18 @@ class FundBill(models.Model):
             bill._check_positive_amount()
             if bill.state != 'draft':
                 raise UserError(_('Only draft bills can be posted.'))
+            bill._lock_requisition_scope(bill.requisition_id)
             if bill.requisition_id.state != 'approved':
                 raise ValidationError(_('Only approved requisitions can be used for bills.'))
+            project, expense = bill.requisition_id._target_values()
+            bill._lock_target_scope(project=project, expense=expense)
+            bill.requisition_id.invalidate_recordset(['billed_amount', 'remaining_billable_amount'])
             if bill.amount > bill.requisition_id.remaining_billable_amount:
                 raise ValidationError(_('A bill cannot exceed the requisition remaining billable amount.'))
-            project, expense = bill.requisition_id._target_values()
             bill._create_target_movement('post_reserved', 'bill_post', 'reserved', 'out', bill.amount, project=project, expense=expense)
             bill._create_target_movement('post_spent', 'bill_post', 'spent', 'in', bill.amount, project=project, expense=expense)
             previous = bill.state
-            bill.write({'state': 'posted'})
+            bill._internal_write({'state': 'posted'})
             bill._history('post', previous, 'posted', project=project, expense_head=expense)
             if bill.requisition_id.remaining_billable_amount <= bill.requisition_id.amount * 0.1:
                 bill.requisition_id.activity_schedule(
@@ -1004,13 +1123,13 @@ class FundBill(models.Model):
         for bill in self:
             if bill.state != 'posted':
                 raise UserError(_('Only posted bills can be reversed.'))
-            if bill.requisition_id.state == 'closed':
-                raise ValidationError(_('Bills cannot be reversed after the requisition is closed.'))
+            if bill.requisition_id.state in ('cancelled', 'closed'):
+                raise ValidationError(_('Bills cannot be reversed after the requisition is cancelled or closed.'))
             project, expense = bill.requisition_id._target_values()
             bill._create_target_movement('reverse_spent', 'bill_reverse', 'spent', 'out', bill.amount, project=project, expense=expense)
             bill._create_target_movement('reverse_reserved', 'bill_reverse', 'reserved', 'in', bill.amount, project=project, expense=expense)
             previous = bill.state
-            bill.write({'state': 'reversed'})
+            bill._internal_write({'state': 'reversed'})
             bill._history('reverse', previous, 'reversed', project=project, expense_head=expense)
 
     def action_cancel(self):
@@ -1018,7 +1137,7 @@ class FundBill(models.Model):
             if bill.state == 'posted':
                 raise UserError(_('Posted bills must be reversed, not cancelled.'))
             previous = bill.state
-            bill.write({'state': 'cancelled'})
+            bill._internal_write({'state': 'cancelled'})
             bill._history('cancel', previous, 'cancelled')
 
     def unlink(self):
@@ -1060,9 +1179,23 @@ class FundTransfer(models.Model):
     def create(self, vals_list):
         seq = self.env['ir.sequence']
         for vals in vals_list:
+            if vals.get('state') not in (None, False, 'draft'):
+                raise AccessError(_('Transfers must be submitted and approved through the workflow.'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = seq.next_by_code('fund.transfer') or _('New')
         return super().create(vals_list)
+
+    def write(self, vals):
+        self._guard_financial_write(vals, {
+            'source_project_id',
+            'source_expense_head_id',
+            'destination_project_id',
+            'destination_expense_head_id',
+            'amount',
+            'requested_by_id',
+            'company_id',
+        }, locked_states={'submitted', 'gm_approved', 'approved', 'rejected', 'cancelled'})
+        return super().write(vals)
 
     @api.constrains('source_project_id', 'source_expense_head_id', 'destination_project_id', 'destination_expense_head_id')
     def _check_targets(self):
@@ -1098,7 +1231,7 @@ class FundTransfer(models.Model):
             transfer._create_target_movement('submit_available', 'transfer_submit', 'available', 'out', transfer.amount, project=source_project, expense=source_expense)
             transfer._create_target_movement('submit_hold', 'transfer_submit', 'transfer_hold', 'in', transfer.amount, project=source_project, expense=source_expense)
             previous = transfer.state
-            transfer.write({'state': 'submitted'})
+            transfer._internal_write({'state': 'submitted'})
             transfer._create_approval_steps('transfer', rules=rules)
             transfer._history('submit', previous, 'submitted', amount=transfer.amount, project=source_project, expense_head=source_expense)
             transfer.message_post(body=_('Transfer submitted.'))
@@ -1110,14 +1243,14 @@ class FundTransfer(models.Model):
             previous = transfer.state
             transfer._approve_step(comment=comment)
             if transfer._pending_step():
-                transfer.write({'state': 'gm_approved'})
+                transfer._internal_write({'state': 'gm_approved'})
                 transfer._schedule_current_approver_activity()
             else:
                 source_project, source_expense = transfer._source()
                 dest_project, dest_expense = transfer._destination()
                 transfer._create_target_movement('approve_hold', 'transfer_approve', 'transfer_hold', 'out', transfer.amount, project=source_project, expense=source_expense)
                 transfer._create_target_movement('approve_destination', 'transfer_approve', 'available', 'in', transfer.amount, project=dest_project, expense=dest_expense)
-                transfer.write({'state': 'approved'})
+                transfer._internal_write({'state': 'approved'})
                 transfer._history('approve', previous, 'approved', amount=transfer.amount, project=source_project, expense_head=source_expense)
                 transfer.message_post(body=_('Transfer approved.'))
 
@@ -1130,6 +1263,7 @@ class FundTransfer(models.Model):
 
     def action_cancel(self):
         for transfer in self:
+            transfer._check_cancel_allowed()
             if transfer.state == 'approved':
                 raise UserError(_('Approved transfers cannot be cancelled after destination funding is created.'))
             if transfer.state in ('rejected', 'cancelled'):
@@ -1138,7 +1272,7 @@ class FundTransfer(models.Model):
                 transfer._release_hold('cancelled')
             else:
                 previous = transfer.state
-                transfer.write({'state': 'cancelled'})
+                transfer._internal_write({'state': 'cancelled'})
                 transfer._history('cancel', previous, 'cancelled')
 
     def _release_hold(self, final_state):
@@ -1147,12 +1281,12 @@ class FundTransfer(models.Model):
         self._create_target_movement(final_state + '_hold', 'transfer_release', 'transfer_hold', 'out', self.amount, project=source_project, expense=source_expense)
         self._create_target_movement(final_state + '_available', 'transfer_release', 'available', 'in', self.amount, project=source_project, expense=source_expense)
         previous = self.state
-        self.write({'state': final_state})
+        self._internal_write({'state': final_state})
         self._history('cancel' if final_state == 'cancelled' else 'reject', previous, final_state, project=source_project, expense_head=source_expense)
 
     def unlink(self):
         for transfer in self:
-            if transfer.state not in ('draft', 'cancelled'):
+            if transfer.state != 'draft' or transfer._movement_exists('submit_available') or transfer.approval_history_ids:
                 raise UserError(_('Submitted financial requests cannot be deleted. Cancel or reject them instead.'))
         return super().unlink()
 
