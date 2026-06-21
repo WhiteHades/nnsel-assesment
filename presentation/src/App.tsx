@@ -69,7 +69,7 @@ const evidence = [
 ];
 
 const metrics = [
-  { value: "16", label: "module tests" },
+  { value: "24", label: "module tests" },
   { value: "0", label: "latest test failures" },
   { value: "2", label: "approval tiers" },
   { value: "6", label: "core workflows" },
